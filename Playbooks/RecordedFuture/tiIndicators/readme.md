@@ -10,7 +10,7 @@ See https://docs.microsoft.com/en-us/azure/active-directory/develop/quickstart-r
 
 I'm not using the Logic App connector for Microsoft Graph Security because it requires both a highly privileged enterprise application, and a service account with at least Security Administrator RBAC permissions, which is way more than what we need in this case.
 
-Once you have the applications clientId, clientSecret, the tenantId and your Recorded Future API key, the templates can be deployed with the following Powershell script (update the variables as necessary):
+Once you have the applications clientId & clientSecret, the tenantId, and your Recorded Future API key, the templates can be deployed with the following Powershell script (update the variables as necessary):
 ```Powershell
 Import-Module -Name Az
 Connect-AzAccount
