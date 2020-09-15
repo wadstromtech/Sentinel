@@ -1,0 +1,204 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "LogicAppName": {
+            "defaultValue": "RF-TI-Import-DomainDefault_Alerting",
+            "type": "string"
+        },
+        "BatchingLogicAppName": {
+            "defaultValue": "RF-TI-Batching-DomainDefault",
+            "type": "string"
+        },
+        "tenantId":{
+            "type": "string"
+        },
+        "recordedFutureApiKey":{
+            "type": "securestring"
+        }
+    },
+    "variables": {
+        "RecordedFutureConnectionName": "recordedfuture",
+        "RF_TI_Batching_DomainDefault_externalid": "[concat('subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Logic/workflows/', parameters('BatchingLogicAppName'))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Web/connections",
+            "apiVersion": "2016-06-01",
+            "name": "[variables('RecordedFutureConnectionName')]",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "displayName": "[variables('RecordedFutureConnectionName')]",
+                "parameterValues": {
+                    "api_key": "[parameters('recordedFutureApiKey')]"
+                },
+                "customParameterValues": {},
+                "api": {
+                    "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/recordedfuture')]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "[parameters('LogicAppName')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/connections', variables('RecordedFutureConnectionName'))]"
+            ],
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "azureTenantId":{
+                            "type": "string",
+                            "defaultValue": "[parameters('tenantId')]"
+                        },
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        }
+                    },
+                    "triggers": {
+                        "Recurrence": {
+                            "recurrence": {
+                                "frequency": "Hour",
+                                "interval": 1
+                            },
+                            "type": "Recurrence"
+                        }
+                    },
+                    "actions": {
+                        "For_each": {
+                            "foreach": "@body('Recorded_Future_RiskLists_and_SCF_Download')",
+                            "actions": {
+                                "Parse_JSON": {
+                                    "runAfter": {},
+                                    "type": "ParseJson",
+                                    "inputs": {
+                                        "content": "@items('For_each')",
+                                        "schema": {
+                                            "properties": {
+                                                "EvidenceDetails": {
+                                                    "properties": {
+                                                        "EvidenceDetails": {
+                                                            "items": {
+                                                                "properties": {
+                                                                    "Criticality": {
+                                                                        "type": "integer"
+                                                                    },
+                                                                    "CriticalityLabel": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "EvidenceString": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "Rule": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "Timestamp": {
+                                                                        "type": "integer"
+                                                                    }
+                                                                },
+                                                                "required": [
+                                                                    "Rule",
+                                                                    "EvidenceString",
+                                                                    "CriticalityLabel",
+                                                                    "Timestamp",
+                                                                    "Criticality"
+                                                                ],
+                                                                "type": "object"
+                                                            },
+                                                            "type": "array"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "Name": {
+                                                    "type": "string"
+                                                },
+                                                "Risk": {
+                                                    "type": "integer"
+                                                },
+                                                "riskString": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "RF-TI-Batching-DomainDefault": {
+                                    "runAfter": {
+                                        "Parse_JSON": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "SendToBatch",
+                                    "inputs": {
+                                        "batchName": "RFDomainDefault",
+                                        "content": {
+                                            "action": "alert",
+                                            "additionalInformation": "@{body('Parse_JSON')?['EvidenceDetails']?['EvidenceDetails']}",
+                                            "azureTenantId": "@{parameters('azureTenantId')}",
+                                            "confidence": "@body('Parse_JSON')?['Risk']",
+                                            "description": "Recorded Future Domain - Default Risklist",
+                                            "expirationDateTime": "@{addHours(utcNow(), 1)}",
+                                            "domainName": "@{body('Parse_JSON')?['Name']}",
+                                            "passiveOnly": true,
+                                            "targetProduct": "Azure Sentinel",
+                                            "threatType": "WatchList",
+                                            "tlpLevel": "unknown"
+                                        },
+                                        "host": {
+                                            "triggerName": "Batch_messages",
+                                            "workflow": {
+                                                "id": "[variables('RF_TI_Batching_DomainDefault_externalid')]"
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "runAfter": {
+                                "Recorded_Future_RiskLists_and_SCF_Download": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Foreach"
+                        },
+                        "Recorded_Future_RiskLists_and_SCF_Download": {
+                            "runAfter": {},
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['recordedfuture']['connectionId']"
+                                    }
+                                },
+                                "method": "get",
+                                "path": "/fusion/files/",
+                                "queries": {
+                                    "path": "/public/MicrosoftAzure/domain_default.json"
+                                }
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {
+                            "recordedfuture": {
+                                "connectionId": "[resourceId('Microsoft.Web/connections', variables('RecordedFutureConnectionName'))]",
+                                "connectionName": "[variables('RecordedFutureConnectionName')]",
+                                "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/recordedfuture')]"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}
