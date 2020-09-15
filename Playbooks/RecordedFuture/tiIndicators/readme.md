@@ -49,6 +49,6 @@ foreach($alertingTemplate in $alertingTemplates)
 ```
 
 ## Deploy an individual template
-Each template can be deployed by pressing the 'Deploy to Azure' button.
+Each template can be deployed individualy from Github by pressing the 'Deploy to Azure' button.
 
 **Note** you need to deploy the batching template before the alerting template.
