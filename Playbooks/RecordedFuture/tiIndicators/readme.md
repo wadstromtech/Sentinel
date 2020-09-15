@@ -47,3 +47,8 @@ foreach($alertingTemplate in $alertingTemplates)
     New-AzResourceGroupDeployment -ResourceGroupName $resourceGroup -TemplateFile $alertingTemplate.FullName @alertingParams -Verbose
 }
 ```
+
+## Deploy an individual template
+Each template can be deployed by pressing the 'Deploy to Azure' button.
+
+**Note** you need to deploy the batching template before the alerting template.
