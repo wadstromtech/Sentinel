@@ -8,7 +8,7 @@ Before deploying the templates you need to create an app registration in Azure A
 
 See https://docs.microsoft.com/en-us/azure/active-directory/develop/quickstart-register-app for more information.
 
-The Logic Apps does not use the Logic App connector for Microsoft Graph Security because it requires both a highly privileged enterprise application, and a service account with at least Security Administrator RBAC permissions, which is way more than what we need in this case.
+The Logic Apps does not use the Logic App connector for Microsoft Graph Security because the connector requires both a highly privileged enterprise application, and a service account with at least Security Administrator RBAC permissions, which is way more than what we need in this case.
 
 Once you have the applications clientId & clientSecret, the tenantId, and your Recorded Future API key, the templates can be deployed with the following Powershell script (update the variables as necessary):
 ```Powershell
